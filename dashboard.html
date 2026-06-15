@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>♻️ 锂电黑粉·金属价格看板 | AI Factory</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;background:#0b1120;color:#e2e8f0;padding:14px}
+.header{display:flex;justify-content:space-between;align-items:center;padding:12px 18px;background:linear-gradient(135deg,#162d50 0%,#0a1628 100%);border-radius:10px;margin-bottom:12px;border:1px solid #1e3a5f}
+.header h1{font-size:18px;font-weight:700}
+.header h1 span{color:#60a5fa}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
+.badge-green{background:#065f46;color:#6ee7b7}
+.header .time{font-size:12px;color:#94a3b8;margin-left:6px}
+/* TABS */
+.tabs{display:flex;gap:3px;margin-bottom:10px;flex-wrap:wrap}
+.tab{padding:6px 14px;border-radius:6px 6px 0 0;font-size:12px;font-weight:600;cursor:pointer;background:#1a2744;color:#64748b;border:1px solid transparent;transition:all .2s}
+.tab:hover{background:#1e3a5f;color:#93c5fd}
+.tab.active{background:#c65911;color:#fff;border-color:#ed7d31}
+/* SECTIONS */
+.section{display:none}
+.section.active{display:block}
+/* CARDS */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:16px}
+.card{background:#131e33;border-radius:8px;padding:12px;border:1px solid #1e2940;transition:border-color .15s}
+.card:hover{border-color:#2d4a6a}
+.card h3{font-size:11px;color:#94a3b8;margin-bottom:2px}
+.card .price{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}
+.card .price.up{color:#ef4444}
+.card .price.down{color:#22c55e}
+.card .range{font-size:11px;color:#64748b;margin-top:1px}
+.card .meta{font-size:11px;color:#475569;margin-top:3px;display:flex;justify-content:space-between}
+.badge-cat{display:inline-block;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:600;margin-bottom:4px}
+.badge-spot{background:#1e3a5f;color:#93c5fd}
+.badge-futures{background:#3b1f4e;color:#c084fc}
+.badge-rate{background:#1a3a2a;color:#6ee7b7}
+.badge-lithium{background:#1e3a5f;color:#60a5fa}
+.badge-ore{background:#3b2a1a;color:#d4a373}
+.badge-cobalt{background:#2a1a3b;color:#a78bfa}
+.badge-nickel{background:#2a2a1a;color:#fbbf24}
+.badge-manganese{background:#2a1f1a;color:#fb923c}
+.badge-cathode{background:#1a2a2a;color:#34d399}
+.badge-recycle{background:#2a1a2a;color:#e879f9}
+.badge-scrap{background:#2a2020;color:#fca5a5}
+/* CHARTS */
+.chart-box{width:100%;height:300px}
+.chart-section{background:#131e33;border-radius:8px;padding:14px;margin-bottom:12px;border:1px solid #1e2940}
+.chart-section h2,.info-section h2{font-size:14px;margin-bottom:10px;color:#94a3b8}
+.tab-sm{font-size:11px;padding:4px 10px}
+/* MODAL */
+.modal-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:1000;justify-content:center;align-items:center}
+.modal-overlay.active{display:flex}
+.modal-content{background:#131e33;border-radius:10px;padding:16px;width:90%;max-width:900px;max-height:85vh;overflow:auto;border:1px solid #2d4a6a;position:relative}
+.modal-close{position:absolute;top:8px;right:12px;color:#94a3b8;font-size:24px;cursor:pointer;background:none;border:none;line-height:1}
+.modal-close:hover{color:#ef4444}
+.modal-title{font-size:15px;font-weight:600;color:#f59e0b;margin-bottom:10px;padding-right:30px}
+.modal-chart{width:100%;height:350px}
+.modal-info{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:#64748b;margin-bottom:8px}
+.modal-info span{background:#0b1120;padding:4px 8px;border-radius:4px;border:1px solid #1e2940}
+/* COMPARE */
+.comp-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;background:#0b1120;padding:8px 12px;border-radius:6px;border:1px solid #1e2940}
+.comp-bar input{background:#131e33;border:1px solid #2d4a6a;color:#e2e8f0;padding:6px 10px;border-radius:5px;font-size:12px;flex:1;min-width:150px}
+.comp-bar input:focus{outline:none;border-color:#c65911}
+.comp-tags{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px}
+.comp-tag{display:flex;align-items:center;gap:4px;background:#1e3a5f;color:#93c5fd;padding:2px 6px;border-radius:4px;font-size:11px}
+.comp-tag button{background:none;border:none;color:#ef4444;cursor:pointer;font-size:14px;padding:0 2px;line-height:1}
+.comp-hint{position:absolute;background:#131e33;border:1px solid #2d4a6a;border-radius:4px;max-height:180px;overflow-y:auto;z-index:100;width:100%}
+.comp-hint div{padding:4px 8px;font-size:11px;cursor:pointer;color:#94a3b8}
+.comp-hint div:hover{background:#1e3a5f;color:#93c5fd}
+.comp-wrap{position:relative;flex:1}
+.card{cursor:pointer}
+/* CALC */
+.calc-panel{background:#131e33;border-radius:8px;padding:14px;margin-bottom:12px;border:1px solid #1e2940}
+.calc-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;align-items:center}
+.calc-row label{font-size:12px;color:#94a3b8;min-width:80px}
+.calc-row input,.calc-row select{background:#0b1120;border:1px solid #ed7d31;color:#e2e8f0;padding:5px 8px;border-radius:5px;font-size:12px;width:100px}
+.calc-row .result{font-size:16px;font-weight:700;padding:3px 10px;border-radius:5px}
+.calc-row .result.profit{color:#22c55e;background:#065f4633}
+.calc-row .result.loss{color:#ef4444;background:#7f1d1d33}
+.calc-row button{padding:5px 14px;background:#c65911;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:12px;font-weight:600}
+.calc-row button:hover{background:#b84a0a}
+.calc-detail{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px;margin-top:6px}
+.calc-item{background:#0b1120;padding:6px 10px;border-radius:5px;border:1px solid #1e2940}
+.calc-item .label{font-size:10px;color:#64748b}
+.calc-item .value{font-size:14px;font-weight:600;color:#93c5fd}
+/* INFO */
+.info-section{background:#131e33;border-radius:8px;padding:14px;margin-bottom:12px;border:1px solid #1e2940}
+.tbl{width:100%;border-collapse:collapse;font-size:11px}
+.tbl th{background:#1e3a5f;color:#93c5fd;padding:4px 6px;text-align:center;border:1px solid #2d4a6a}
+.tbl td{padding:4px 6px;text-align:center;border:1px solid #1e2940;color:#cbd5e1}
+.tbl tr:nth-child(even){background:#0d1524}
+/* FORMULA BOX */
+.formula-box{background:#0b1120;padding:10px 14px;border-radius:6px;border:1px solid #c65911;font-size:12px;line-height:1.7;color:#cbd5e1;margin-top:8px}
+.formula-box b{color:#f59e0b}
+.footer{text-align:center;color:#334155;font-size:11px;padding:12px;border-top:1px solid #1e2940;margin-top:6px}
+@media(max-width:640px){body{padding:6px}.header{flex-direction:column;gap:4px;text-align:center}.card .price{font-size:20px}.chart-box{height:240px}.tab{padding:5px 10px;font-size:11px}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div><h1>♻️ 锂电黑粉 · <span>金属价格看板</span></h1></div>
+  <div><span class="badge badge-green">● 实时</span><span class="time" id="headerTime">加载中...</span></div>
+</div>
+
+<div class="tabs" id="tabBar">
+  <div class="tab active" onclick="switchTab('prices')">📊 行情</div>
+  <div class="tab" onclick="switchTab('calc')">🧮 黑粉计价</div>
+  <div class="tab" onclick="switchTab('ref')">📚 行业参考</div>
+  <div class="tab" onclick="switchTab('charts')">📈 趋势</div>
+</div>
+
+<!-- ========== TAB 1: 价格行情 ========== -->
+<div class="section active" id="tab-prices">
+  <div class="tabs" style="margin-bottom:8px">
+    <div class="tab tab-sm active" onclick="switchSubTab('all','prices')">🌐 全部</div>
+    <div class="tab tab-sm" onclick="switchSubTab('lithium','prices')">🔋 锂盐</div>
+    <div class="tab tab-sm" onclick="switchSubTab('ore','prices')">⛏️ 锂矿</div>
+    <div class="tab tab-sm" onclick="switchSubTab('cobalt','prices')">🔵 钴</div>
+    <div class="tab tab-sm" onclick="switchSubTab('nickel','prices')">🟤 镍</div>
+    <div class="tab tab-sm" onclick="switchSubTab('manganese','prices')">🔶 锰</div>
+    <div class="tab tab-sm" onclick="switchSubTab('cathode','prices')">⚡ 正极材料</div>
+    <div class="tab tab-sm" onclick="switchSubTab('recycle','prices')">♻️ 回收</div>
+    <div class="tab tab-sm" onclick="switchSubTab('scrap','prices')">🗑️ 废旧</div>
+    <div class="tab tab-sm" onclick="switchSubTab('futures','prices')">📈 期货</div>
+  </div>
+  <div class="grid" id="priceGrid"><div style="grid-column:1/-1;text-align:center;padding:30px;color:#64748b">⏳ 加载中...</div></div>
+</div>
+
+<!-- ========== TAB 2: 黑粉计价 — 双场景 ========== -->
+<div class="section" id="tab-calc">
+  <!-- 场景切换标签 -->
+  <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+    <div class="tab" style="cursor:default;background:#0b1120;color:#94a3b8;border:1px solid #1e2940;border-radius:6px">选择场景:</div>
+    <div class="tab active" id="tabCalcBuy" onclick="switchCalcTab('buy')">💰 采购黑粉</div>
+    <div class="tab" id="tabCalcOut" onclick="switchCalcTab('out')">🏭 委外加工</div>
+  </div>
+
+  <!-- ========== 场景1: 采购黑粉 ========== -->
+  <div class="calc-panel" id="calcPanelBuy">
+    <h2 style="font-size:15px;margin-bottom:10px;color:#f59e0b">💰 采购黑粉 — 价格合理性评估</h2>
+    <div style="font-size:11px;color:#94a3b8;margin-bottom:8px">输入供应商报价 → 判断采购是否划算</div>
+
+    <div class="calc-row"><label>黑粉重量(吨)</label><input type="number" id="buyWeight" value="1" min="0.1" step="0.1"></div>
+    <div class="calc-row"><label>Ni品位(%)</label><input type="number" id="buyNi" value="15" min="0" step="0.5"></div>
+    <div class="calc-row"><label>Co品位(%)</label><input type="number" id="buyCo" value="5" min="0" step="0.5"></div>
+    <div class="calc-row"><label>Li品位(%)</label><input type="number" id="buyLi" value="3.5" min="0" step="0.5"></div>
+    <div style="border-top:1px solid #1e2940;margin:6px 0;padding-top:6px">
+      <div style="font-size:11px;color:#c65911;margin-bottom:4px">▼ 各金属计价系数（独立设置）</div>
+      <div class="calc-row"><label>Ni计价系数</label><input type="number" id="buyKFNi" value="0.70" min="0" max="1" step="0.05"></div>
+      <div class="calc-row"><label>Co计价系数</label><input type="number" id="buyKFCo" value="0.65" min="0" max="1" step="0.05"></div>
+      <div class="calc-row"><label>Li计价系数</label><input type="number" id="buyKFLi" value="0.60" min="0" max="1" step="0.05"></div>
+    </div>
+    <div style="border-top:1px solid #1e2940;margin:6px 0;padding-top:6px">
+      <div style="font-size:11px;color:#c65911;margin-bottom:4px">▼ 成本参数</div>
+      <div class="calc-row"><label>供应商<span style="color:#f59e0b">报价</span>(元/吨)</label><input type="number" id="buyQuote" value="60000" min="0" step="1000"></div>
+      <div class="calc-row"><label>加工费(元/吨)</label><input type="number" id="buyPC" value="28000" min="5000" step="1000"></div>
+      <div class="calc-row"><label>杂质扣减(元/吨)</label><input type="number" id="buyDed" value="500" min="0" step="100"></div>
+      <div class="calc-row"><label>运杂费(元/吨)</label><input type="number" id="buyTransport" value="500" min="0" step="100"></div>
+      <div class="calc-row"><label>水分(%)</label><input type="number" id="buyH2O" value="3" min="0" step="0.5"></div>
+    </div>
+    <div class="calc-row"><button onclick="calcPurchase()">💰 计算采购效益</button></div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin:6px 0">
+      <div style="background:#0b1120;padding:6px 12px;border-radius:6px;border:1px solid #1e3a5f;flex:1;min-width:120px">
+        <div style="font-size:10px;color:#64748b">Ni价/系数</div>
+        <div style="font-size:11px;color:#94a3b8;margin-top:1px" id="buyPriceRefNi">—</div>
+      </div>
+      <div style="background:#0b1120;padding:6px 12px;border-radius:6px;border:1px solid #1e3a5f;flex:1;min-width:120px">
+        <div style="font-size:10px;color:#64748b">Co价/系数</div>
+        <div style="font-size:11px;color:#94a3b8;margin-top:1px" id="buyPriceRefCo">—</div>
+      </div>
+      <div style="background:#0b1120;padding:6px 12px;border-radius:6px;border:1px solid #1e3a5f;flex:1;min-width:120px">
+        <div style="font-size:10px;color:#64748b">Li价/系数</div>
+        <div style="font-size:11px;color:#94a3b8;margin-top:1px" id="buyPriceRefLi">—</div>
+      </div>
+      <div style="background:#0b1120;padding:6px 12px;border-radius:6px;border:1px solid #1e3a5f;flex:1;min-width:100px">
+        <div style="font-size:10px;color:#64748b">干重</div>
+        <div style="font-size:12px;color:#94a3b8;margin-top:1px" id="buyDryRef">—</div>
+      </div>
+    </div>
+
+    <div id="buyResult">
+      <div style="text-align:center;padding:16px;color:#64748b;font-size:12px">填好参数后点击「计算采购效益」</div>
+    </div>
+  </div>
+
+  <!-- ========== 场景2: 委外加工 ========== -->
+  <div class="calc-panel" id="calcPanelOut" style="display:none">
+    <h2 style="font-size:15px;margin-bottom:10px;color:#f59e0b">🏭 委外加工 — 效益评估</h2>
+    <div style="font-size:11px;color:#94a3b8;margin-bottom:8px">黑粉送去加工厂提取金属 → 判断委外是否划算</div>
+
+    <div class="calc-row"><label>黑粉重量(吨)</label><input type="number" id="outWeight" value="1" min="0.1" step="0.1"></div>
+    <div class="calc-row"><label>Ni品位(%)</label><input type="number" id="outNi" value="15" min="0" step="0.5"></div>
+    <div class="calc-row"><label>Co品位(%)</label><input type="number" id="outCo" value="5" min="0" step="0.5"></div>
+    <div class="calc-row"><label>Li品位(%)</label><input type="number" id="outLi" value="3.5" min="0" step="0.5"></div>
+    <div style="border-top:1px solid #1e2940;margin:6px 0;padding-top:6px">
+      <div style="font-size:11px;color:#c65911;margin-bottom:4px">▼ 各金属回收率（独立设置）</div>
+      <div class="calc-row"><label>Ni回收率(%)</label><input type="number" id="outRRNi" value="95" min="0" max="100" step="1"></div>
+      <div class="calc-row"><label>Co回收率(%)</label><input type="number" id="outRRCo" value="93" min="0" max="100" step="1"></div>
+      <div class="calc-row"><label>Li回收率(%)</label><input type="number" id="outRRLi" value="85" min="0" max="100" step="1"></div>
+    </div>
+    <div style="border-top:1px solid #1e2940;margin:6px 0;padding-top:6px">
+      <div style="font-size:11px;color:#c65911;margin-bottom:4px">▼ 成本参数</div>
+      <div class="calc-row"><label>加工厂<span style="color:#f59e0b">报价</span>(元/吨)</label><input type="number" id="outQuote" value="25000" min="0" step="1000"></div>
+      <div class="calc-row"><label>运杂费(元/吨)</label><input type="number" id="outTransport" value="800" min="0" step="100"></div>
+      <div class="calc-row"><label>水分(%)</label><input type="number" id="outH2O" value="3" min="0" step="0.5"></div>
+    </div>
+    <div class="calc-row"><button onclick="calcOutsource()">🏭 计算委外效益</button></div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin:6px 0">
+      <div style="background:#0b1120;padding:6px 12px;border-radius:6px;border:1px solid #1e3a5f;flex:1;min-width:120px">
+        <div style="font-size:10px;color:#64748b">Ni价/回收率</div>
+        <div style="font-size:11px;color:#94a3b8;margin-top:1px" id="outPriceRefNi">—</div>
+      </div>
+      <div style="background:#0b1120;padding:6px 12px;border-radius:6px;border:1px solid #1e3a5f;flex:1;min-width:120px">
+        <div style="font-size:10px;color:#64748b">Co价/回收率</div>
+        <div style="font-size:11px;color:#94a3b8;margin-top:1px" id="outPriceRefCo">—</div>
+      </div>
+      <div style="background:#0b1120;padding:6px 12px;border-radius:6px;border:1px solid #1e3a5f;flex:1;min-width:120px">
+        <div style="font-size:10px;color:#64748b">Li价/回收率</div>
+        <div style="font-size:11px;color:#94a3b8;margin-top:1px" id="outPriceRefLi">—</div>
+      </div>
+      <div style="background:#0b1120;padding:6px 12px;border-radius:6px;border:1px solid #1e3a5f;flex:1;min-width:100px">
+        <div style="font-size:10px;color:#64748b">干重</div>
+        <div style="font-size:12px;color:#94a3b8;margin-top:1px" id="outDryRef">—</div>
+      </div>
+    </div>
+
+    <div id="outResult">
+      <div style="text-align:center;padding:16px;color:#64748b;font-size:12px">填好参数后点击「计算委外效益」</div>
+    </div>
+  </div>
+
+  <!-- ========== 双场景对比表 ========== -->
+  <div class="info-section" id="calcCompareSection" style="display:none">
+    <h2>📊 采购 vs 委外 — 效益对比</h2>
+    <div id="calcCompare"></div>
+  </div>
+
+  <!-- ========== 不同品位对比表 ========== -->
+  <div class="info-section">
+    <h2>📊 不同品位黑粉价值参考</h2>
+    <div style="font-size:11px;color:#94a3b8;margin-bottom:8px">基于当前金属价格，用缺省系数/回收率估算</div>
+    <div id="bmGradeRef" style="font-size:12px;color:#64748b;padding:12px;text-align:center">加载中...</div>
+  </div>
+</div>
+
+<!-- ========== TAB 3: 行业参考 ========== -->
+<div class="section" id="tab-ref">
+  <div class="info-section">
+    <h2>🔬 黑粉计价核心公式</h2>
+    <div class="formula-box">
+      <b style="color:#f59e0b">💰 场景1：采购黑粉</b><br>
+      <b>净利润(元/吨)</b> = (Ni折价 + Co折价 + Li折价) − 采购价 − 加工费 − 扣减 − 运杂费<br><br>
+      其中：<br>
+      <b>Ni折价</b> = 品位% × Ni价 × Ni系数<br>
+      <b>Co折价</b> = 品位% × Co价 × Co系数<br>
+      <b>Li折价</b> = 品位% × Li价 × Li系数<br>
+      Ni系数参考 0.70~0.80 | Co系数参考 0.65~0.75 | Li系数参考 0.55~0.65<br><br>
+      <b style="color:#c084fc">🏭 场景2：委外加工</b><br>
+      <b>净利润(元/吨)</b> = (Ni回收值 + Co回收值 + Li回收值) − 加工厂报价 − 运杂费<br><br>
+      其中：<br>
+      <b>Ni回收值</b> = 品位% × Ni价 × Ni回收率%<br>
+      <b>Co回收值</b> = 品位% × Co价 × Co回收率%<br>
+      <b>Li回收值</b> = 品位% × Li价 × Li回收率%<br>
+      Ni回收率参考 93~96% | Co回收率参考 90~95% | Li回收率参考 80~90%<br><br>
+      干基计价：<b>干重</b> = 湿重 × (1 − 水分% / 100)（品位按湿基%输入，价值按干重折算）
+    </div>
+  </div>
+
+  <div class="info-section">
+    <h2>📋 典型黑粉品位参考</h2>
+    <div style="overflow-x:auto"><table class="tbl">
+      <tr><th>来源类型</th><th>Ni%</th><th>Co%</th><th>Li%</th><th>备注</th></tr>
+      <tr><td>三元黑粉(NCM523)</td><td>12-18</td><td>4-7</td><td>3-4</td><td>主流货源</td></tr>
+      <tr><td>三元黑粉(NCM622)</td><td>15-22</td><td>4-7</td><td>3-4</td><td>高镍型</td></tr>
+      <tr><td>三元黑粉(NCM811)</td><td>20-30</td><td>2-4</td><td>3-4</td><td>超高镍</td></tr>
+      <tr><td>钴酸锂黑粉(LCO)</td><td>&lt;3</td><td>40-55</td><td>3-4</td><td>高Co价值</td></tr>
+      <tr><td>铁锂黑粉(LFP)</td><td>&lt;0.5</td><td>&lt;0.3</td><td>2.5-3.5</td><td>仅Li计价</td></tr>
+      <tr><td>混合料</td><td>8-15</td><td>3-8</td><td>2.5-4</td><td>折价系数</td></tr>
+    </table></div>
+  </div>
+
+  <div class="info-section">
+    <h2>📊 计价系数参考 (按品位分档)</h2>
+    <div style="overflow-x:auto"><table class="tbl">
+      <tr><th>条件</th><th>计价系数</th><th>说明</th></tr>
+      <tr><td>Ni≥20%, Co≥8%</td><td>0.75-0.80</td><td>高品位优质料</td></tr>
+      <tr><td>Ni≥15%, Co≥5%</td><td>0.65-0.75</td><td>中等品位主流料</td></tr>
+      <tr><td>Ni≥10%, Co≥3%</td><td>0.55-0.65</td><td>低品位</td></tr>
+      <tr><td>Ni&lt;10%, Co&lt;3%</td><td>0.40-0.55</td><td>贫料折价</td></tr>
+      <tr><td>Li品位≥3.5%</td><td>+0.05溢价</td><td>Li单独计价</td></tr>
+      <tr><td>Li品位&lt;2%</td><td>不计价</td><td>Li太低忽略</td></tr>
+      <tr><td>含水率&gt;5%</td><td>扣减超出部分</td><td>干基计价</td></tr>
+      <tr><td>Cu/Al超标</td><td>扣500-2000元/吨</td><td>杂质罚扣</td></tr>
+    </table></div>
+  </div>
+
+  <div class="info-section">
+    <h2>🏭 加工成本结构</h2>
+    <div style="overflow-x:auto"><table class="tbl">
+      <tr><th>环节</th><th>费用(元/吨黑粉)</th><th>占比</th></tr>
+      <tr><td>① 破碎分选</td><td>3,000-5,000</td><td>10-15%</td></tr>
+      <tr><td>② 湿法浸出</td><td>12,000-18,000</td><td>40-50%</td></tr>
+      <tr><td>③ 萃取分离</td><td>5,000-8,000</td><td>15-25%</td></tr>
+      <tr><td>④ 产品精制</td><td>3,000-5,000</td><td>10-15%</td></tr>
+      <tr style="background:#1e3a5f"><td><b>合计</b></td><td><b>23,000-36,000</b></td><td><b>100%</b></td></tr>
+    </table></div>
+  </div>
+</div>
+
+<!-- ========== TAB 4: 趋势图 ========== -->
+<div class="section" id="tab-charts">
+  <div class="chart-section"><h2>📈 碳酸锂 — 历史走势</h2><div id="chartLC" class="chart-box"></div></div>
+  <div class="chart-section"><h2>📈 钴系列 — 历史走势</h2><div id="chartCo" class="chart-box"></div></div>
+  <div class="chart-section"><h2>📈 镍 — 历史走势</h2><div id="chartNi" class="chart-box"></div></div>
+  <div class="chart-section"><h2>📈 指数 — 历史走势</h2><div id="chartIndex" class="chart-box"></div></div>
+  <div class="chart-section"><h2>📈 国际价格 — 历史走势</h2><div id="chartIntl" class="chart-box"></div></div>
+
+  <!-- ===== 自定义走势对比 ===== -->
+  <div class="chart-section">
+    <h2>🎯 自定义品种走势对比</h2>
+    <div style="font-size:11px;color:#64748b;margin-bottom:6px">搜索并添加品种（现货/期货/国际），叠加在同一张图对比</div>
+    <div class="comp-bar">
+      <div class="comp-wrap">
+        <input type="text" id="compSearch" placeholder="输入名称搜索..." oninput="filterComp()" onfocus="filterComp()" onblur="setTimeout(function(){document.getElementById('compHint').style.display='none'},200)">
+        <div class="comp-hint" id="compHint"></div>
+      </div>
+      <button onclick="renderCompareChart()" style="background:#c65911;color:#fff;border:none;border-radius:5px;padding:5px 12px;cursor:pointer;font-size:12px">📊 对比</button>
+      <button onclick="clearCompare()" style="background:#1e2940;color:#94a3b8;border:1px solid #2d4a6a;border-radius:5px;padding:5px 12px;cursor:pointer;font-size:11px">清空</button>
+    </div>
+    <div class="comp-tags" id="compTags"><div style="font-size:11px;color:#475569" id="compEmpty">尚未添加品种，搜索后点击名称添加</div></div>
+    <div id="compareChart" class="chart-box" style="height:350px"></div>
+  </div>
+</div>
+
+<!-- ========== MODAL: 单品历史走势 ========== -->
+<div class="modal-overlay" id="historyModal" onclick="if(event.target===this)closeModal()">
+  <div class="modal-content">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div class="modal-title" id="modalTitle">品种历史走势</div>
+    <div class="modal-info" id="modalInfo"></div>
+    <div id="modalChart" class="modal-chart"></div>
+  </div>
+</div>
+
+<div class="footer">♻️ 锂电黑粉回收看板 · AI Factory 3.0 · 数据: SMM / Yahoo Finance / 新浪财经 · 每日 16:30 BJT 更新</div>
+
+<script>
+const DATA = {"last_update": "2026-06-15 12:34:40 UTC+08:00", "today": "2026-06-15", "all_dates": ["2026-06-14", "2026-06-15"], "today_data": [{"product": "SMM电池级碳酸锂指数", "price": 170885.0, "low": 170885.0, "high": 170885.0, "change": 264.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "电池级碳酸锂", "price": 170500.0, "low": 166000.0, "high": 175000.0, "change": 0.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "工业级碳酸锂", "price": 166500.0, "low": 162000.0, "high": 171000.0, "change": 0.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "SMM电池级氢氧化锂指数", "price": 155318.0, "low": 155318.0, "high": 155318.0, "change": -2320.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "电池级氢氧化锂（粗颗粒）", "price": 155000.0, "low": 148000.0, "high": 162000.0, "change": -1500.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "电池级氢氧化锂(微粉）", "price": 161000.0, "low": 154000.0, "high": 168000.0, "change": -1500.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "工业级氢氧化锂", "price": 142500.0, "low": 139000.0, "high": 146000.0, "change": -1500.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "电池级碳酸锂（CIF中日韩）", "price": 21.33, "low": 20.35, "high": 22.3, "change": 0.0, "unit": "美元/千克", "source": "SMM", "category": "国内现货"}, {"product": "电池级氢氧化锂(CIF中日韩)", "price": 19.7, "low": 18.25, "high": 21.15, "change": -0.125, "unit": "美元/千克", "source": "SMM", "category": "国内现货"}, {"product": "电池级碳酸锂(CIF韩国)", "price": 21.2, "low": 20.15, "high": 22.25, "change": 0.0, "unit": "美元/千克", "source": "SMM", "category": "国内现货"}, {"product": "电池级氢氧化锂(CIF韩国)", "price": 19.6, "low": 18.1, "high": 21.1, "change": -0.13, "unit": "美元/千克", "source": "SMM", "category": "国内现货"}, {"product": "非洲硫酸锂(CIF中国)", "price": 8353.0, "low": 8108.0, "high": 8598.0, "change": 9.5, "unit": "美元/吨", "source": "SMM", "category": "国内现货"}, {"product": "六氟磷酸锂（国产）", "price": 114000.0, "low": 110000.0, "high": 118000.0, "change": 0.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "SMM六氟磷酸锂指数", "price": 104497.0, "low": 102407.0, "high": 106587.0, "change": -76.5, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "电池级氟化锂", "price": 291500.0, "low": 288000.0, "high": 295000.0, "change": 0.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "电池级无水氯化锂", "price": 265.0, "low": 235.0, "high": 295.0, "change": 0.0, "unit": "元/千克", "source": "SMM", "category": "国内现货"}, {"product": "电池级金属锂", "price": 1135000.0, "low": 1100000.0, "high": 1170000.0, "change": 0.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "工业级金属锂", "price": 1105000.0, "low": 1070000.0, "high": 1140000.0, "change": 0.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "非洲锂辉石精矿（CIF中国）指数", "price": 2470.0, "low": 2470.0, "high": 2470.0, "change": 172.0, "unit": "美元/吨", "source": "SMM", "category": "国内现货"}, {"product": "澳大利亚锂辉石精矿（CIF中国）现货", "price": 2505.0, "low": 2450.0, "high": 2560.0, "change": -5.0, "unit": "美元/吨", "source": "SMM", "category": "国内现货"}, {"product": "巴西锂辉石精矿（CIF中国）现货", "price": 2490.0, "low": 2430.0, "high": 2550.0, "change": -5.0, "unit": "美元/吨", "source": "SMM", "category": "国内现货"}, {"product": "津巴布韦锂辉石精矿（CIF中国）现货", "price": 2475.0, "low": 2420.0, "high": 2530.0, "change": 125.0, "unit": "美元/吨", "source": "SMM", "category": "国内现货"}, {"product": "SMM硫酸钴指数", "price": 89058.0, "low": 89058.0, "high": 89058.0, "change": -666.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "硫酸钴", "price": 89250.0, "low": 88000.0, "high": 90500.0, "change": -750.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "氯化钴", "price": 111000.0, "low": 108000.0, "high": 114000.0, "change": -1500.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "四氧化三钴", "price": 344500.0, "low": 339000.0, "high": 350000.0, "change": -1000.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "电解钴", "price": 397500.0, "low": 385000.0, "high": 410000.0, "change": -1000.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "氧化钴", "price": 322500.0, "low": 315000.0, "high": 330000.0, "change": -5500.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "碳酸钴", "price": 223500.0, "low": 215000.0, "high": 232000.0, "change": -4000.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "金属钴FOB", "price": 25.25, "low": 25.0, "high": 25.5, "change": 0.0, "unit": "美元/磅", "source": "SMM", "category": "国内现货"}, {"product": "电解钴（鹿特丹仓库）", "price": 26.15, "low": 25.5, "high": 26.8, "change": 0.03, "unit": "美元/磅", "source": "SMM", "category": "国内现货"}, {"product": "钴中间品中钴含量≥30%", "price": 25737.0, "low": 25737.0, "high": 25737.0, "change": -925.0, "unit": "元/金属吨", "source": "SMM", "category": "国内现货"}, {"product": "钴中间品原料计价系数（对SMM硫酸钴均价）", "price": 99.5, "low": 99.0, "high": 100.0, "change": 0.0, "unit": "%", "source": "SMM", "category": "国内现货"}, {"product": "MHP钴元素计价系数（对SMM硫酸钴均价）", "price": 92.5, "low": 92.0, "high": 93.0, "change": 0.0, "unit": "%", "source": "SMM", "category": "国内现货"}, {"product": "SMM电池级硫酸镍指数", "price": 33050.0, "low": 33050.0, "high": 33050.0, "change": 12.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "电池级硫酸镍", "price": 33610.0, "low": 33400.0, "high": 33820.0, "change": 10.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "电镀级硫酸镍", "price": 36750.0, "low": 34500.0, "high": 39000.0, "change": 0.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "氯化镍NiCl₂·6H₂O", "price": 40000.0, "low": 39000.0, "high": 41000.0, "change": 0.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "氧化亚镍", "price": 122000.0, "low": 118000.0, "high": 126000.0, "change": 0.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "MHP系数（对SMM电池级硫酸镍指数）", "price": 85.5, "low": 85.0, "high": 86.0, "change": 0.5, "unit": "%", "source": "SMM", "category": "国内现货"}, {"product": "SMM电池级硫酸锰指数", "price": 7646.0, "low": 7646.0, "high": 7646.0, "change": 6.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "电池级硫酸锰（出厂价）", "price": 7690.0, "low": 7590.0, "high": 7790.0, "change": 0.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "四氧化三锰（电池级）", "price": 15000.0, "low": 14000.0, "high": 16000.0, "change": 0.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "磷酸铁锂", "price": 60070.0, "low": 59570.0, "high": 60570.0, "change": 0.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "磷酸锰铁锂", "price": 67000.0, "low": 64500.0, "high": 69500.0, "change": 0.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "钴酸锂", "price": 383500.0, "low": 382000.0, "high": 385000.0, "change": 0.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "5系三元材料", "price": 191350.0, "low": 186900.0, "high": 195800.0, "change": -400.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "6系三元材料（单晶/动力型）", "price": 195750.0, "low": 191000.0, "high": 200500.0, "change": -300.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "8系三元材料", "price": 219100.0, "low": 214300.0, "high": 223900.0, "change": -400.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "NCA三元材料", "price": 215750.0, "low": 211600.0, "high": 219900.0, "change": -600.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "5系三元前驱体", "price": 104050.0, "low": 101450.0, "high": 106650.0, "change": -200.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "6系三元前驱体（单晶/动力型）", "price": 96550.0, "low": 94200.0, "high": 98900.0, "change": -100.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "8系三元前驱体（多晶/动力型）", "price": 119550.0, "low": 116650.0, "high": 122450.0, "change": -150.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "SMM三元极片粉镍系数指数", "price": 79.05, "low": 79.05, "high": 79.05, "change": 0.0, "unit": "%", "source": "SMM", "category": "国内现货"}, {"product": "SMM三元极片粉钴系数指数", "price": 79.0, "low": 79.0, "high": 79.0, "change": 0.0, "unit": "%", "source": "SMM", "category": "国内现货"}, {"product": "SMM三元极片粉锂系数指数", "price": 79.05, "low": 79.05, "high": 79.05, "change": 0.0, "unit": "%", "source": "SMM", "category": "国内现货"}, {"product": "SMM三元电池粉镍系数指数", "price": 75.83, "low": 75.83, "high": 75.83, "change": -0.16, "unit": "%", "source": "SMM", "category": "国内现货"}, {"product": "SMM三元电池粉钴系数指数", "price": 75.72, "low": 75.72, "high": 75.72, "change": -0.13, "unit": "%", "source": "SMM", "category": "国内现货"}, {"product": "SMM三元电池粉锂系数指数", "price": 75.83, "low": 75.83, "high": 75.83, "change": -0.16, "unit": "%", "source": "SMM", "category": "国内现货"}, {"product": "SMM钴酸锂极片粉钴系数指数", "price": 82.53, "low": 82.53, "high": 82.53, "change": -0.78, "unit": "%", "source": "SMM", "category": "国内现货"}, {"product": "SMM钴酸锂极片粉锂系数指数", "price": 76.5, "low": 76.5, "high": 76.5, "change": -0.26, "unit": "%", "source": "SMM", "category": "国内现货"}, {"product": "SMM钴酸锂电池粉钴系数指数", "price": 80.13, "low": 80.13, "high": 80.13, "change": -0.92, "unit": "%", "source": "SMM", "category": "国内现货"}, {"product": "SMM钴酸锂电池粉锂系数指数", "price": 76.11, "low": 76.11, "high": 76.11, "change": -0.31, "unit": "%", "source": "SMM", "category": "国内现货"}, {"product": "SMM磷酸铁锂极片粉指数", "price": 7494.0, "low": 7494.0, "high": 7494.0, "change": 58.0, "unit": "元/锂点", "source": "SMM", "category": "国内现货"}, {"product": "SMM磷酸铁锂电池粉指数", "price": 7062.0, "low": 7062.0, "high": 7062.0, "change": 1.0, "unit": "元/锂点", "source": "SMM", "category": "国内现货"}, {"product": "废旧磷酸铁锂铝壳电池", "price": 18550.0, "low": 17800.0, "high": 19300.0, "change": 0.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "废旧磷酸铁锂钢壳电池", "price": 11300.0, "low": 10800.0, "high": 11800.0, "change": 0.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "废旧磷酸铁锂软包电池", "price": 17450.0, "low": 16600.0, "high": 18300.0, "change": 0.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "废旧磷酸铁锂动力正极片", "price": 28675.0, "low": 26600.0, "high": 30750.0, "change": 425.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "废旧磷酸铁锂储能正极片", "price": 23975.0, "low": 22400.0, "high": 25550.0, "change": 325.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "钴酸锂铝壳", "price": 89000.0, "low": 84000.0, "high": 94000.0, "change": 0.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "钴酸锂聚合物软包", "price": 99800.0, "low": 98000.0, "high": 101600.0, "change": 0.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "锰酸锂圆柱钢壳", "price": 6200.0, "low": 5000.0, "high": 7400.0, "change": 0.0, "unit": "元/吨", "source": "SMM", "category": "国内现货"}, {"product": "三元方壳锂电B品", "price": 0.8, "low": 0.75, "high": 0.85, "change": 0.0, "unit": "元/Ah", "source": "SMM", "category": "国内现货"}, {"product": "方形磷酸铁锂电池B品", "price": 0.74, "low": 0.68, "high": 0.8, "change": 0.0, "unit": "元/Ah", "source": "SMM", "category": "国内现货"}, {"product": "沪镍(NI)连续", "price": 131640.0, "low": 131780.0, "high": 133980.0, "change": -1850.0, "unit": "元/吨", "source": "上期所", "category": "国内期货", "settle": 133550.0, "open_price": 145958.0}, {"product": "美元/人民币(USDCNY)", "price": 6.7614, "low": 6.7565, "high": 6.7621, "change": null, "unit": "人民币", "source": "新浪财经", "category": "国内期货"}, {"product": "CME氢氧化锂", "price": 21.96, "low": null, "high": null, "change": 0.0, "unit": "USD", "source": "Yahoo Finance", "category": "国际期货"}, {"product": "CME钴", "price": 25.1, "low": null, "high": null, "change": 0.0, "unit": "USD", "source": "Yahoo Finance", "category": "国际期货"}], "historical": {"5系三元前驱体": {"dates": ["2026-06-15"], "prices": [104050.0], "changes": [-200.0]}, "5系三元材料": {"dates": ["2026-06-15"], "prices": [191350.0], "changes": [-400.0]}, "6系三元前驱体（单晶/动力型）": {"dates": ["2026-06-15"], "prices": [96550.0], "changes": [-100.0]}, "6系三元材料（单晶/动力型）": {"dates": ["2026-06-15"], "prices": [195750.0], "changes": [-300.0]}, "8系三元前驱体（多晶/动力型）": {"dates": ["2026-06-15"], "prices": [119550.0], "changes": [-150.0]}, "8系三元材料": {"dates": ["2026-06-15"], "prices": [219100.0], "changes": [-400.0]}, "CME氢氧化锂": {"dates": ["2026-06-14", "2026-06-15"], "prices": [21.96, 21.96], "changes": [-0.29, 0.0]}, "CME钴": {"dates": ["2026-06-14", "2026-06-15"], "prices": [25.1, 25.1], "changes": [0.0, 0.0]}, "MHP系数（对SMM电池级硫酸镍指数）": {"dates": ["2026-06-15"], "prices": [85.5], "changes": [0.5]}, "MHP钴元素计价系数（对SMM硫酸钴均价）": {"dates": ["2026-06-15"], "prices": [92.5], "changes": [0.0]}, "NCA三元材料": {"dates": ["2026-06-15"], "prices": [215750.0], "changes": [-600.0]}, "SMM三元极片粉钴系数指数": {"dates": ["2026-06-15"], "prices": [79.0], "changes": [0.0]}, "SMM三元极片粉锂系数指数": {"dates": ["2026-06-15"], "prices": [79.05], "changes": [0.0]}, "SMM三元极片粉镍系数指数": {"dates": ["2026-06-15"], "prices": [79.05], "changes": [0.0]}, "SMM三元电池粉钴系数指数": {"dates": ["2026-06-15"], "prices": [75.72], "changes": [-0.13]}, "SMM三元电池粉锂系数指数": {"dates": ["2026-06-15"], "prices": [75.83], "changes": [-0.16]}, "SMM三元电池粉镍系数指数": {"dates": ["2026-06-15"], "prices": [75.83], "changes": [-0.16]}, "SMM六氟磷酸锂指数": {"dates": ["2026-06-15"], "prices": [104497.0], "changes": [-76.5]}, "SMM电池级氢氧化锂指数": {"dates": ["2026-06-14", "2026-06-15"], "prices": [157638.0, 155318.0], "changes": [2899.0, -2320.0]}, "SMM电池级硫酸锰指数": {"dates": ["2026-06-15"], "prices": [7646.0], "changes": [6.0]}, "SMM电池级硫酸镍指数": {"dates": ["2026-06-14", "2026-06-15"], "prices": [33038.0, 33050.0], "changes": [-135.0, 12.0]}, "SMM电池级碳酸锂指数": {"dates": ["2026-06-14", "2026-06-15"], "prices": [170621.0, 170885.0], "changes": [3941.0, 264.0]}, "SMM硫酸钴指数": {"dates": ["2026-06-14", "2026-06-15"], "prices": [89724.0, 89058.0], "changes": [-16.0, -666.0]}, "SMM磷酸铁锂极片粉指数": {"dates": ["2026-06-15"], "prices": [7494.0], "changes": [58.0]}, "SMM磷酸铁锂电池粉指数": {"dates": ["2026-06-15"], "prices": [7062.0], "changes": [1.0]}, "SMM钴酸锂极片粉钴系数指数": {"dates": ["2026-06-15"], "prices": [82.53], "changes": [-0.78]}, "SMM钴酸锂极片粉锂系数指数": {"dates": ["2026-06-15"], "prices": [76.5], "changes": [-0.26]}, "SMM钴酸锂电池粉钴系数指数": {"dates": ["2026-06-15"], "prices": [80.13], "changes": [-0.92]}, "SMM钴酸锂电池粉锂系数指数": {"dates": ["2026-06-15"], "prices": [76.11], "changes": [-0.31]}, "三元方壳锂电B品": {"dates": ["2026-06-15"], "prices": [0.8], "changes": [0.0]}, "六氟磷酸锂（国产）": {"dates": ["2026-06-15"], "prices": [114000.0], "changes": [0.0]}, "四氧化三钴": {"dates": ["2026-06-14", "2026-06-15"], "prices": [345500.0, 344500.0], "changes": [-1500.0, -1000.0]}, "四氧化三锰（电池级）": {"dates": ["2026-06-15"], "prices": [15000.0], "changes": [0.0]}, "工业级氢氧化锂": {"dates": ["2026-06-15"], "prices": [142500.0], "changes": [-1500.0]}, "工业级碳酸锂": {"dates": ["2026-06-14", "2026-06-15"], "prices": [166500.0, 166500.0], "changes": [4000.0, 0.0]}, "工业级金属锂": {"dates": ["2026-06-15"], "prices": [1105000.0], "changes": [0.0]}, "巴西锂辉石精矿（CIF中国）现货": {"dates": ["2026-06-15"], "prices": [2490.0], "changes": [-5.0]}, "废旧磷酸铁锂储能正极片": {"dates": ["2026-06-15"], "prices": [23975.0], "changes": [325.0]}, "废旧磷酸铁锂动力正极片": {"dates": ["2026-06-15"], "prices": [28675.0], "changes": [425.0]}, "废旧磷酸铁锂软包电池": {"dates": ["2026-06-15"], "prices": [17450.0], "changes": [0.0]}, "废旧磷酸铁锂钢壳电池": {"dates": ["2026-06-15"], "prices": [11300.0], "changes": [0.0]}, "废旧磷酸铁锂铝壳电池": {"dates": ["2026-06-15"], "prices": [18550.0], "changes": [0.0]}, "方形磷酸铁锂电池B品": {"dates": ["2026-06-15"], "prices": [0.74], "changes": [0.0]}, "氧化亚镍": {"dates": ["2026-06-15"], "prices": [122000.0], "changes": [0.0]}, "氧化钴": {"dates": ["2026-06-15"], "prices": [322500.0], "changes": [-5500.0]}, "氯化钴": {"dates": ["2026-06-14", "2026-06-15"], "prices": [112500.0, 111000.0], "changes": [0.0, -1500.0]}, "氯化镍NiCl₂·6H₂O": {"dates": ["2026-06-15"], "prices": [40000.0], "changes": [0.0]}, "沪镍(NI)连续": {"dates": ["2026-06-14", "2026-06-15"], "prices": [131640.0, 131640.0], "changes": [-1850.0, -1850.0]}, "津巴布韦锂辉石精矿（CIF中国）现货": {"dates": ["2026-06-15"], "prices": [2475.0], "changes": [125.0]}, "澳大利亚锂辉石精矿（CIF中国）现货": {"dates": ["2026-06-15"], "prices": [2505.0], "changes": [-5.0]}, "电池级无水氯化锂": {"dates": ["2026-06-15"], "prices": [265.0], "changes": [0.0]}, "电池级氟化锂": {"dates": ["2026-06-15"], "prices": [291500.0], "changes": [0.0]}, "电池级氢氧化锂(CIF中日韩)": {"dates": ["2026-06-15"], "prices": [19.7], "changes": [-0.125]}, "电池级氢氧化锂(CIF韩国)": {"dates": ["2026-06-15"], "prices": [19.6], "changes": [-0.13]}, "电池级氢氧化锂(微粉）": {"dates": ["2026-06-15"], "prices": [161000.0], "changes": [-1500.0]}, "电池级氢氧化锂（粗颗粒）": {"dates": ["2026-06-14", "2026-06-15"], "prices": [156500.0, 155000.0], "changes": [4000.0, -1500.0]}, "电池级硫酸锰（出厂价）": {"dates": ["2026-06-15"], "prices": [7690.0], "changes": [0.0]}, "电池级硫酸镍": {"dates": ["2026-06-14", "2026-06-15"], "prices": [33600.0, 33610.0], "changes": [-100.0, 10.0]}, "电池级碳酸锂": {"dates": ["2026-06-14", "2026-06-15"], "prices": [170500.0, 170500.0], "changes": [4000.0, 0.0]}, "电池级碳酸锂(CIF韩国)": {"dates": ["2026-06-15"], "prices": [21.2], "changes": [0.0]}, "电池级碳酸锂（CIF中日韩）": {"dates": ["2026-06-15"], "prices": [21.33], "changes": [0.0]}, "电池级金属锂": {"dates": ["2026-06-15"], "prices": [1135000.0], "changes": [0.0]}, "电解钴": {"dates": ["2026-06-14", "2026-06-15"], "prices": [398500.0, 397500.0], "changes": [-4000.0, -1000.0]}, "电解钴（鹿特丹仓库）": {"dates": ["2026-06-15"], "prices": [26.15], "changes": [0.03]}, "电镀级硫酸镍": {"dates": ["2026-06-15"], "prices": [36750.0], "changes": [0.0]}, "硫酸钴": {"dates": ["2026-06-14", "2026-06-15"], "prices": [90000.0, 89250.0], "changes": [0.0, -750.0]}, "碳酸钴": {"dates": ["2026-06-15"], "prices": [223500.0], "changes": [-4000.0]}, "磷酸铁锂": {"dates": ["2026-06-15"], "prices": [60070.0], "changes": [0.0]}, "磷酸锰铁锂": {"dates": ["2026-06-15"], "prices": [67000.0], "changes": [0.0]}, "美元/人民币(USDCNY)": {"dates": ["2026-06-14", "2026-06-15"], "prices": [6.7641, 6.7614], "changes": [null, null]}, "金属钴FOB": {"dates": ["2026-06-15"], "prices": [25.25], "changes": [0.0]}, "钴中间品中钴含量≥30%": {"dates": ["2026-06-15"], "prices": [25737.0], "changes": [-925.0]}, "钴中间品原料计价系数（对SMM硫酸钴均价）": {"dates": ["2026-06-15"], "prices": [99.5], "changes": [0.0]}, "钴酸锂": {"dates": ["2026-06-15"], "prices": [383500.0], "changes": [0.0]}, "钴酸锂聚合物软包": {"dates": ["2026-06-15"], "prices": [99800.0], "changes": [0.0]}, "钴酸锂铝壳": {"dates": ["2026-06-15"], "prices": [89000.0], "changes": [0.0]}, "锰酸锂圆柱钢壳": {"dates": ["2026-06-15"], "prices": [6200.0], "changes": [0.0]}, "非洲硫酸锂(CIF中国)": {"dates": ["2026-06-15"], "prices": [8353.0], "changes": [9.5]}, "非洲锂辉石精矿（CIF中国）指数": {"dates": ["2026-06-15"], "prices": [2470.0], "changes": [172.0]}}};
+
+function fmt(v,p){if(v===null||v===undefined)return'—';return Math.abs(v)>=1000?Number(v).toLocaleString('zh-CN',{maximumFractionDigits:p||0}):Number(v).toFixed(p||2)}
+function gdp(v){return v>0?'up':v<0?'down':''}
+function gsign(v){if(v===null||v===undefined)return'—';return(v>0?'+':'')+fmt(v,2)}
+
+function switchTab(name){
+  document.querySelectorAll('.section').forEach(function(s){s.classList.remove('active')});
+  document.getElementById('tab-'+name).classList.add('active');
+  document.querySelectorAll('#tabBar .tab').forEach(function(t){t.classList.remove('active')});
+  ['prices','calc','ref','charts'].indexOf(name).forEach(function(i){if(i>=0)document.querySelectorAll('#tabBar .tab')[i].classList.add('active')});
+  // fallback
+  var names=['prices','calc','ref','charts'];var idx=names.indexOf(name);
+  if(idx>=0)document.querySelectorAll('#tabBar .tab')[idx].classList.add('active');
+}
+function switchSubTab(sub,tab){
+  document.querySelectorAll('#tab-'+tab+' .tab').forEach(function(t){t.classList.remove('active')});
+  var catNames={'all':'全部','lithium':'锂盐','ore':'锂矿','cobalt':'钴','nickel':'镍','manganese':'锰','cathode':'正极','recycle':'回收','scrap':'废旧','futures':'期货'};
+  document.querySelectorAll('#tab-'+tab+' .tab').forEach(function(t){
+    if(t.textContent.includes(catNames[sub]||sub))t.classList.add('active');
+  });
+  renderPriceCards(sub);
+}
+
+// ====== TAB 1: PRICE CARDS ======
+function catKey(prod){
+  if(!prod)return'other';
+  if(prod.includes('锂辉石')||prod.includes('锂精矿')||prod.includes('硫酸锂(CIF)'))return'ore';
+  if(prod.includes('碳酸锂')||prod.includes('氢氧化锂')||prod.includes('氟化锂')||prod.includes('氯化锂')||prod.includes('金属锂')||prod.includes('六氟')||prod.includes('溴化锂')||prod.includes('硫化锂'))return'lithium';
+  if(prod.includes('钴')||prod.includes('Co'))return'cobalt';
+  if((prod.includes('镍')||prod.includes('Ni'))&&!prod.includes('系数'))return'nickel';
+  if(prod.includes('锰')||prod.includes('四氧化三锰'))return'manganese';
+  if(prod.includes('三元')||prod.includes('磷酸铁锂')||prod.includes('磷酸锰铁锂')||prod.includes('钴酸锂')||prod.includes('NCA')||prod.includes('前驱体'))return'cathode';
+  if(prod.includes('系数')||prod.includes('极片粉')||prod.includes('电池粉')||prod.includes('黑粉')||prod.includes('指数')||prod.includes('锂点')||prod.includes('MHP'))return'recycle';
+  if(prod.includes('废旧')||prod.includes('B品')||prod.includes('铝壳')||prod.includes('钢壳')||prod.includes('软包')||prod.includes('极片')&&!prod.includes('极片粉'))return'scrap';
+  return'other';
+}
+function badgeSub(item){
+  var cat=item.category||'';
+  if(cat==='国内期货'||cat==='国际期货')return'badge-futures';
+  var map={'ore':'badge-ore','lithium':'badge-lithium','cobalt':'badge-cobalt','nickel':'badge-nickel','manganese':'badge-manganese','cathode':'badge-cathode','recycle':'badge-recycle','scrap':'badge-scrap'};
+  return map[catKey(item.product)]||'badge-spot';
+}
+function renderPriceCards(filter){
+  var grid=document.getElementById('priceGrid');
+  if(!DATA.today_data||DATA.today_data.length===0){
+    grid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:24px;color:#94a3b8">暂无数据</div>';return;
+  }
+  var allItems=DATA.today_data;
+  var items;
+  if(filter==='futures'){items=allItems.filter(function(i){return i.category!=='国内现货';});}
+  else if(filter==='all'){items=allItems;}
+  else{items=allItems.filter(function(i){return i.category==='国内现货'&&catKey(i.product)===filter;});}
+  grid.innerHTML='';
+  if(items.length===0){grid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:24px;color:#94a3b8">暂无此类数据</div>';return;}
+  items.sort(function(a,b){var ai=a.product.includes('指数')?0:1,bi=b.product.includes('指数')?0:1;return ai-bi;});
+  items.forEach(function(item){
+    var p=item.price,c=item.change,low=item.low,high=item.high;
+    var cat=item.category||'';
+    var badge=badgeSub(item);
+    var ps='—';
+    if(p!==null&&p!==undefined){
+      var pn=Number(p);
+      if(item.unit==='USD'||item.unit==='美元/磅'||item.unit==='美元/千克'||item.unit==='美元/吨')ps='$'+pn.toFixed(2);
+      else if(item.unit==='人民币'||item.source==='新浪财经')ps=pn.toFixed(3);
+      else if(pn>=1000)ps=pn.toLocaleString('zh-CN');
+      else if(item.unit==='%')ps=pn.toFixed(2)+'%';
+      else if(item.unit==='元/锂点')ps=pn.toLocaleString('zh-CN');
+      else ps=pn.toFixed(2);
+    }
+    var cs=gsign(c);
+    var rs='';
+    if(low!==null&&low!==undefined&&high!==null&&high!==undefined&&low!==high){
+      var lf=Number(low),hf=Number(high);
+      rs=(lf>=1000?lf.toLocaleString('zh-CN'):lf.toFixed(2))+' ~ '+(hf>=1000?hf.toLocaleString('zh-CN'):hf.toFixed(2));
+    }
+    var prod=item.product;
+    var card=document.createElement('div');card.className='card';
+    card.onclick=function(){openHistory(prod);};
+    card.innerHTML='<div class="badge-cat '+badge+'">'+cat+'</div><h3>'+(prod||'')+'</h3>'+
+      '<div class="price '+gdp(c)+'">'+ps+'</div>'+(rs?'<div class="range">📊 区间: '+rs+'</div>':'')+
+      '<div class="meta"><span>涨跌: '+cs+'</span><span>'+(item.unit||'')+'</span></div>'+
+      '<div class="meta">'+(item.source||'')+'</div>'+
+      '<div style="font-size:9px;color:#2d4a6a;margin-top:4px;text-align:right">🖱️ 点击看图</div>';
+    grid.appendChild(card);
+  });
+}
+
+// ====== TAB 2: 黑粉计价 ======
+var lastBuyResult=null,lastOutResult=null;
+
+function getPrice(product){
+  if(!DATA.today_data)return null;
+  for(var i=0;i<DATA.today_data.length;i++){
+    if(DATA.today_data[i].product===product&&DATA.today_data[i].category==='国内现货')return Number(DATA.today_data[i].price);
+  }
+  return null;
+}
+
+function switchCalcTab(mode){
+  document.getElementById('calcPanelBuy').style.display=(mode==='buy'?'block':'none');
+  document.getElementById('calcPanelOut').style.display=(mode==='out'?'block':'none');
+  document.getElementById('tabCalcBuy').className='tab'+(mode==='buy'?' active':'');
+  document.getElementById('tabCalcOut').className='tab'+(mode==='out'?' active':'');
+}
+
+/* ====== 场景1: 采购黑粉 ======
+  逻辑：向供应商买黑粉，自己加工
+  毛利 = (Ni品位×Ni价×Ni系数 + Co品位×Co价×Co系数 + Li品位×Li价×Li系数) × 重量
+  净利润 = 毛利 - 采购款 - 加工费 - 杂质扣减 - 运杂费
+  采购款 = 供应商报价 × 重量
+  → 净利润>0 = 供应商报价合理，可以采购
+*/
+function calcPurchase(){
+  var wt=parseFloat(document.getElementById('buyWeight').value)||1;
+  var niG=parseFloat(document.getElementById('buyNi').value)||0;
+  var coG=parseFloat(document.getElementById('buyCo').value)||0;
+  var liG=parseFloat(document.getElementById('buyLi').value)||0;
+  var kfNi=parseFloat(document.getElementById('buyKFNi').value)||0;
+  var kfCo=parseFloat(document.getElementById('buyKFCo').value)||0;
+  var kfLi=parseFloat(document.getElementById('buyKFLi').value)||0;
+  var quote=parseFloat(document.getElementById('buyQuote').value)||0;
+  var pc=parseFloat(document.getElementById('buyPC').value)||28000;
+  var ded=parseFloat(document.getElementById('buyDed').value)||0;
+  var tr=parseFloat(document.getElementById('buyTransport').value)||0;
+  var h2o=parseFloat(document.getElementById('buyH2O').value)||0;
+
+  var niP=getPrice('电池级硫酸镍')||0;
+  var coP=getPrice('硫酸钴')||0;
+  var liP=getPrice('电池级碳酸锂')||0;
+
+  document.getElementById('buyPriceRefNi').innerHTML=fmt(niP)+' 元 / 系数 '+fmt(kfNi,2);
+  document.getElementById('buyPriceRefCo').innerHTML=fmt(coP)+' 元 / 系数 '+fmt(kfCo,2);
+  document.getElementById('buyPriceRefLi').innerHTML=fmt(liP)+' 元 / 系数 '+fmt(kfLi,2);
+
+  var dry=wt*(1-h2o/100);
+  document.getElementById('buyDryRef').innerHTML=fmt(dry,3)+' 吨';
+
+  // 金属价值(按干基)
+  var niV=niG/100*niP*dry*kfNi;
+  var coV=coG/100*coP*dry*kfCo;
+  var liV=liG/100*liP*dry*kfLi;
+  var totalV=niV+coV+liV;        // 合计金属折价价值
+
+  // 采购款(湿基付钱)
+  var buyCost=quote*wt;
+  // 加工+扣减+运费(湿基)
+  var procCost=pc*wt;
+  var dedCost=ded*wt;
+  var trCost=tr*wt;
+
+  var totalCost=buyCost+procCost+dedCost+trCost;  // 总付出
+  var netProfit=totalV-totalCost;                  // 净利润
+  var profitPerTon=netProfit/wt;                   // 每吨净利润
+
+  lastBuyResult={niV,coV,liV,totalV,buyCost,procCost,dedCost,trCost,totalCost,netProfit,profitPerTon,niG,coG,liG,quote,kfNi,kfCo,kfLi,niP,coP,liP,h2o,dry,wt,mode:'buy'};
+
+  showBuyResult();
+  updateCompare();
+}
+
+function showBuyResult(){
+  var r=lastBuyResult;
+  if(!r)return;
+  var isGood=r.netProfit>0;
+  var div=document.getElementById('buyResult');
+  div.innerHTML=
+    '<div class="calc-detail">'+
+    '<div class="calc-item"><div class="label">Ni折价价值 (Ni'+r.niG+'%×'+fmt(r.niP)+'×系数'+fmt(r.kfNi,2)+')</div><div class="value">'+fmt(r.niV)+' 元</div></div>'+
+    '<div class="calc-item"><div class="label">Co折价价值 (Co'+r.coG+'%×'+fmt(r.coP)+'×系数'+fmt(r.kfCo,2)+')</div><div class="value">'+fmt(r.coV)+' 元</div></div>'+
+    '<div class="calc-item"><div class="label">Li折价价值 (Li'+r.liG+'%×'+fmt(r.liP)+'×系数'+fmt(r.kfLi,2)+')</div><div class="value">'+fmt(r.liV)+' 元</div></div>'+
+    '<div class="calc-item"><div class="label" style="color:#ef4444">供应商采购款</div><div class="value" style="color:#ef4444">-'+fmt(r.buyCost)+' 元 ('+fmt(r.quote)+'元/吨×'+fmt(r.wt)+'t)</div></div>'+
+    '<div class="calc-item"><div class="label" style="color:#ef4444">加工费</div><div class="value" style="color:#ef4444">-'+fmt(r.procCost)+' 元</div></div>'+
+    '<div class="calc-item"><div class="label" style="color:#ef4444">杂质扣减+运杂费</div><div class="value" style="color:#ef4444">-'+fmt(r.dedCost+r.trCost)+' 元</div></div>'+
+    '</div>'+
+    '<div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap">'+
+    '<div style="flex:1;min-width:130px;background:#0b1120;border-radius:6px;padding:8px 12px;border:1px solid #1e3a5f">'+
+    '<div style="font-size:10px;color:#64748b">毛金属折价价值</div><div style="font-size:18px;font-weight:700;color:#93c5fd">'+fmt(r.totalV)+' 元</div></div>'+
+    '<div style="flex:1;min-width:130px;background:#0b1120;border-radius:6px;padding:8px 12px;border:1px solid #1e3a5f">'+
+    '<div style="font-size:10px;color:#64748b">总成本</div><div style="font-size:18px;font-weight:700;color:#ea580c">'+fmt(r.totalCost)+' 元</div></div>'+
+    '<div style="flex:1;min-width:140px;background:#0b1120;border-radius:6px;padding:8px 12px;border:1px solid '+(isGood?'#065f46':'#7f1d1d')+'"">'+
+    '<div style="font-size:10px;color:'+(isGood?'#22c55e':'#ef4444')+'">'+(isGood?'✅ 采购划算':'❌ 采购亏损')+'</div>'+
+    '<div style="font-size:20px;font-weight:700;color:'+(isGood?'#22c55e':'#ef4444')+'">'+(r.profitPerTon>=0?'+':'')+fmt(r.profitPerTon)+' 元/吨</div></div>'+
+    '</div>'+
+    (isGood?'':'<div style="margin-top:6px;background:#7f1d1d33;border:1px solid #7f1d1d;border-radius:5px;padding:6px 10px;font-size:11px;color:#fca5a5">建议: 请供应商将报价降至 <b style="color:#fbbf24">'+fmt(r.quote-r.profitPerTon)+' 元/吨</b> 以下</div>'+
+    '<div style="font-size:10px;color:#475569;margin-top:2px">目标价 = 当前报价 - 亏损 ' + fmt(Math.abs(r.profitPerTon)) + ' 元/吨 = ' + fmt(r.quote-Math.abs(r.profitPerTon)) + ' 元/吨</div>');
+}
+
+/* ====== 场景2: 委外加工 ======
+  逻辑：黑粉自己的，送加工厂提取金属
+  可回收价值 = (Ni品位×Ni价×Ni回收率 + Co品位×Co价×Co回收率 + Li品位×Li价×Li回收率) × 重量
+  净利润 = 可回收价值 - 加工厂报价 - 运杂费
+  → 净利润>0 = 委外加工划算
+*/
+function calcOutsource(){
+  var wt=parseFloat(document.getElementById('outWeight').value)||1;
+  var niG=parseFloat(document.getElementById('outNi').value)||0;
+  var coG=parseFloat(document.getElementById('outCo').value)||0;
+  var liG=parseFloat(document.getElementById('outLi').value)||0;
+  var rrNi=parseFloat(document.getElementById('outRRNi').value)||0;
+  var rrCo=parseFloat(document.getElementById('outRRCo').value)||0;
+  var rrLi=parseFloat(document.getElementById('outRRLi').value)||0;
+  var quote=parseFloat(document.getElementById('outQuote').value)||0;
+  var tr=parseFloat(document.getElementById('outTransport').value)||0;
+  var h2o=parseFloat(document.getElementById('outH2O').value)||0;
+
+  var niP=getPrice('电池级硫酸镍')||0;
+  var coP=getPrice('硫酸钴')||0;
+  var liP=getPrice('电池级碳酸锂')||0;
+
+  document.getElementById('outPriceRefNi').innerHTML=fmt(niP)+' 元 / 回收率 '+fmt(rrNi,0)+'%';
+  document.getElementById('outPriceRefCo').innerHTML=fmt(coP)+' 元 / 回收率 '+fmt(rrCo,0)+'%';
+  document.getElementById('outPriceRefLi').innerHTML=fmt(liP)+' 元 / 回收率 '+fmt(rrLi,0)+'%';
+
+  var dry=wt*(1-h2o/100);
+  document.getElementById('outDryRef').innerHTML=fmt(dry,3)+' 吨';
+
+  // 按干基计算回收价值
+  var niRV=niG/100*niP*dry*(rrNi/100);
+  var coRV=coG/100*coP*dry*(rrCo/100);
+  var liRV=liG/100*liP*dry*(rrLi/100);
+  var totalRV=niRV+coRV+liRV;      // 可回收金属总价值
+
+  // 加工厂报价+运杂费
+  var procCost=quote*wt;
+  var trCost=tr*wt;
+  var totalCost=procCost+trCost;
+  var netProfit=totalRV-totalCost;
+  var profitPerTon=netProfit/wt;
+
+  lastOutResult={niRV,coRV,liRV,totalRV,procCost,trCost,totalCost,netProfit,profitPerTon,niG,coG,liG,quote,rrNi,rrCo,rrLi,niP,coP,liP,h2o,dry,wt,mode:'out'};
+
+  showOutResult();
+  updateCompare();
+}
+
+function showOutResult(){
+  var r=lastOutResult;
+  if(!r)return;
+  var isGood=r.netProfit>0;
+  var div=document.getElementById('outResult');
+  div.innerHTML=
+    '<div class="calc-detail">'+
+    '<div class="calc-item"><div class="label">Ni回收价值 (Ni'+r.niG+'%×'+fmt(r.niP)+'×RR'+fmt(r.rrNi,0)+'%)</div><div class="value">'+fmt(r.niRV)+' 元</div></div>'+
+    '<div class="calc-item"><div class="label">Co回收价值 (Co'+r.coG+'%×'+fmt(r.coP)+'×RR'+fmt(r.rrCo,0)+'%)</div><div class="value">'+fmt(r.coRV)+' 元</div></div>'+
+    '<div class="calc-item"><div class="label">Li回收价值 (Li'+r.liG+'%×'+fmt(r.liP)+'×RR'+fmt(r.rrLi,0)+'%)</div><div class="value">'+fmt(r.liRV)+' 元</div></div>'+
+    '<div class="calc-item"><div class="label" style="color:#ef4444">加工厂报价</div><div class="value" style="color:#ef4444">-'+fmt(r.procCost)+' 元</div></div>'+
+    '<div class="calc-item"><div class="label" style="color:#ef4444">运杂费</div><div class="value" style="color:#ef4444">-'+fmt(r.trCost)+' 元</div></div>'+
+    '</div>'+
+    '<div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap">'+
+    '<div style="flex:1;min-width:130px;background:#0b1120;border-radius:6px;padding:8px 12px;border:1px solid #1e3a5f">'+
+    '<div style="font-size:10px;color:#64748b">可回收金属总价值</div><div style="font-size:18px;font-weight:700;color:#93c5fd">'+fmt(r.totalRV)+' 元</div></div>'+
+    '<div style="flex:1;min-width:130px;background:#0b1120;border-radius:6px;padding:8px 12px;border:1px solid #1e3a5f">'+
+    '<div style="font-size:10px;color:#64748b">总成本</div><div style="font-size:18px;font-weight:700;color:#ea580c">'+fmt(r.totalCost)+' 元</div></div>'+
+    '<div style="flex:1;min-width:140px;background:#0b1120;border-radius:6px;padding:8px 12px;border:1px solid '+(isGood?'#065f46':'#7f1d1d')+'">'+
+    '<div style="font-size:10px;color:'+(isGood?'#22c55e':'#ef4444')+'">'+(isGood?'✅ 委外划算':'❌ 委外亏损')+'</div>'+
+    '<div style="font-size:20px;font-weight:700;color:'+(isGood?'#22c55e':'#ef4444')+'">'+(r.profitPerTon>=0?'+':'')+fmt(r.profitPerTon)+' 元/吨</div></div>'+
+    '</div>'+
+    (isGood?'':'<div style="margin-top:6px;background:#7f1d1d33;border:1px solid #7f1d1d;border-radius:5px;padding:6px 10px;font-size:11px;color:#fca5a5">建议: 请加工厂将报价降至 <b style="color:#fbbf24">'+fmt(r.quote-Math.abs(r.profitPerTon))+' 元/吨</b> 以下</div>');
+}
+
+/* ====== 双场景对比 ====== */
+function updateCompare(){
+  if(!lastBuyResult&&!lastOutResult){document.getElementById('calcCompareSection').style.display='none';return;}
+  document.getElementById('calcCompareSection').style.display='block';
+  var div=document.getElementById('calcCompare');
+  var html='<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr))">';
+  if(lastBuyResult){
+    var b=lastBuyResult;var bg=b.netProfit>0;
+    html+='<div class="card" style="padding:12px;border-color:'+(bg?'#065f46':'#7f1d1d')+'">'+
+      '<h3 style="font-size:13px;color:#f59e0b">💰 采购黑粉</h3>'+
+      '<div class="price '+(bg?'up':'down')+'">'+(b.profitPerTon>=0?'+':'')+fmt(b.profitPerTon)+' 元/吨</div>'+
+      '<div class="meta">供应商报价: '+fmt(b.quote)+' 元/吨</div>'+
+      '<div class="meta">毛折价: '+fmt(b.totalV)+' 元 | 总成本: '+fmt(b.totalCost)+' 元</div>'+
+      '<div class="meta" style="color:'+(bg?'#22c55e':'#ef4444')+'">'+(bg?'✅':'❌')+' '+(bg?'可采购':'建议压价至'+(b.quote-b.profitPerTon)+'元/吨')+'</div></div>';
+  }
+  if(lastOutResult){
+    var o=lastOutResult;var og=o.netProfit>0;
+    html+='<div class="card" style="padding:12px;border-color:'+(og?'#065f46':'#7f1d1d')+'">'+
+      '<h3 style="font-size:13px;color:#f59e0b">🏭 委外加工</h3>'+
+      '<div class="price '+(og?'up':'down')+'">'+(o.profitPerTon>=0?'+':'')+fmt(o.profitPerTon)+' 元/吨</div>'+
+      '<div class="meta">加工厂报价: '+fmt(o.quote)+' 元/吨</div>'+
+      '<div class="meta">回收价值: '+fmt(o.totalRV)+' 元 | 总成本: '+fmt(o.totalCost)+' 元</div>'+
+      '<div class="meta" style="color:'+(og?'#22c55e':'#ef4444')+'">'+(og?'✅':'❌')+' '+(og?'可委外':'建议压加工费')+'</div></div>';
+  }
+  if(lastBuyResult&&lastOutResult){
+    var bpf=lastBuyResult.profitPerTon,opf=lastOutResult.profitPerTon;
+    var winner=bpf>=opf?'采购':'委外';
+    html+='<div class="card" style="padding:12px;border-color:#c65911;grid-column:1/-1">'+
+      '<h3 style="font-size:13px;color:#fbbf24">🏆 推荐方案</h3>'+
+      '<div style="font-size:20px;font-weight:700;color:#22c55e">选择「'+winner+'」模式</div>'+
+      '<div class="meta">采购 '+(bpf>=0?'+':'')+fmt(bpf)+' 元/吨 vs 委外 '+(opf>=0?'+':'')+fmt(opf)+' 元/吨</div></div>';
+  }
+  html+='</div>';
+  div.innerHTML=html;
+}
+
+/* ====== 品位参考对比表 ====== */
+function initGradeRef(){
+  var div=document.getElementById('bmGradeRef');
+  var niP=getPrice('电池级硫酸镍')||0;
+  var coP=getPrice('硫酸钴')||0;
+  var liP=getPrice('电池级碳酸锂')||0;
+  if(!niP&&!coP&&!liP){div.innerHTML='<div style="color:#475569">暂无金属价格数据，请等待数据更新</div>';return;}
+
+  var grades=[
+    {name:'NCM523 低品位',Ni:12,Co:4,Li:3},
+    {name:'NCM523 中品位',Ni:15,Co:5,Li:3.5},
+    {name:'NCM523 高品位',Ni:18,Co:7,Li:4},
+    {name:'NCM811 超高镍',Ni:25,Co:3,Li:3.5},
+    {name:'LCO 钴酸锂',Ni:1,Co:45,Li:3.5},
+    {name:'混合料',Ni:10,Co:4,Li:3},
+  ];
+  var kfNi=0.70,kfCo=0.65,kfLi=0.60;
+  var rrNi=95,rrCo=93,rrLi=85;
+
+  var html='<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr))">';
+  grades.forEach(function(g){
+    // 采购：按系数折价
+    var bNiV=g.Ni/100*niP*1*kfNi;
+    var bCoV=g.Co/100*coP*1*kfCo;
+    var bLiV=g.Li/100*liP*1*kfLi;
+    var bTV=bNiV+bCoV+bLiV;
+    // 委外：按回收率
+    var oNiRV=g.Ni/100*niP*1*(rrNi/100);
+    var oCoRV=g.Co/100*coP*1*(rrCo/100);
+    var oLiRV=g.Li/100*liP*1*(rrLi/100);
+    var oTV=oNiRV+oCoRV+oLiRV;
+
+    html+='<div class="card" style="padding:10px"><h3 style="color:#94a3b8">'+g.name+'</h3>'+
+      '<div style="display:flex;gap:6px;margin-top:4px">'+
+      '<div style="flex:1;background:#0b1120;border-radius:4px;padding:4px"><div style="font-size:9px;color:#64748b">💰 采购(系数价)</div><div style="font-size:16px;font-weight:700;color:#93c5fd">'+fmt(bTV)+'</div></div>'+
+      '<div style="flex:1;background:#0b1120;border-radius:4px;padding:4px"><div style="font-size:9px;color:#64748b">🏭 委外(回收价)</div><div style="font-size:16px;font-weight:700;color:#c084fc">'+fmt(oTV)+'</div></div></div>'+
+      '<div class="meta">Ni:'+g.Ni+'% Co:'+g.Co+'% Li:'+g.Li+'%</div></div>';
+  });
+  html+='</div>';
+  div.innerHTML=html;
+}
+
+
+// ====== TAB 4: CHARTS ======
+function renderCharts(data){
+  if(!data||!data.historical)return;
+  renderLine('chartLC','碳酸锂',['电池级碳酸锂','SMM电池级碳酸锂指数','工业级碳酸锂'],data);
+  renderLine('chartCo','钴系列',['硫酸钴','氯化钴','电解钴','SMM硫酸钴指数'],data);
+  renderLine('chartNi','镍系列',['电池级硫酸镍','SMM电池级硫酸镍指数','MHP系数（对SMM电池级硫酸镍指数）'],data);
+  renderLine('chartIndex','锂电指数',['SMM电池级碳酸锂指数','SMM电池级氢氧化锂指数','SMM硫酸钴指数','SMM电池级硫酸镍指数','SMM电池级硫酸锰指数','SMM六氟磷酸锂指数','SMM磷酸铁锂极片粉指数'],data);
+  renderIntlChart(data);
+}
+
+function renderLine(domId,title,products,data){
+  var dom=document.getElementById(domId);if(!dom)return;
+  var chart=echarts.init(dom,'dark');var series=[];
+  products.forEach(function(p){
+    var h=data.historical[p];if(!h||!h.prices||h.prices.length===0)return;
+    series.push({name:p,type:'line',smooth:true,symbolSize:4,data:h.prices,lineStyle:{width:2},emphasis:{focus:'series'}});
+  });
+  if(series.length===0){chart.setOption({title:{text:'暂无数据',textStyle:{color:'#64748b'}}});return;}
+  var allDates=[];products.forEach(function(p){var h=data.historical[p];if(h&&h.dates)allDates=allDates.concat(h.dates);});
+  allDates=[...new Set(allDates)].sort();
+  chart.setOption({
+    tooltip:{trigger:'axis',axisPointer:{type:'cross'},
+      formatter:function(params){
+        var h='<strong>'+params[0].axisValue+'</strong><br/>';
+        params.forEach(function(p){h+=p.marker+' '+p.seriesName+': '+(p.value>=1000?Number(p.value).toLocaleString('zh-CN'):Number(p.value).toFixed(2))+'<br/>';});return h;
+      }
+    },
+    legend:{data:products,textStyle:{color:'#94a3b8',fontSize:10},top:0},
+    grid:{left:'3%',right:'4%',bottom:'12%',top:'15%',containLabel:true},
+    xAxis:{type:'category',data:allDates,axisLine:{lineStyle:{color:'#2d3a50'}},axisLabel:{color:'#64748b',fontSize:10}},
+    yAxis:{type:'value',splitLine:{lineStyle:{color:'#1e293b',type:'dashed'}},axisLabel:{color:'#64748b',fontSize:10,
+      formatter:function(v){return v>=1000?Math.round(v/1000)+'k':v;}}},
+    dataZoom:[{type:'inside',start:0,end:100},{type:'slider',start:0,end:100,height:18,bottom:2,borderColor:'#2d3a50'}],
+    series:series
+  });
+  window.addEventListener('resize',function(){try{chart.resize()}catch(e){}});
+}
+
+function renderIntlChart(data){
+  var dom=document.getElementById('chartIntl');if(!dom)return;
+  var chart=echarts.init(dom,'dark');var products=['CME氢氧化锂','CME钴'];var series=[];
+  products.forEach(function(p){
+    var h=data.historical[p];if(!h||!h.prices||h.prices.length===0)return;
+    series.push({name:p,type:'line',smooth:true,symbolSize:4,data:h.prices});
+  });
+  if(series.length===0){chart.setOption({title:{text:'暂无数据',textStyle:{color:'#64748b'}}});return;}
+  var allDates=[];products.forEach(function(p){var h=data.historical[p];if(h&&h.dates)allDates=allDates.concat(h.dates);});
+  allDates=[...new Set(allDates)].sort();
+  chart.setOption({
+    tooltip:{trigger:'axis',formatter:function(params){
+      var h='<strong>'+params[0].axisValue+'</strong><br/>';
+      params.forEach(function(p){h+=p.marker+' '+p.seriesName+': $'+(p.value||0).toFixed(2)+'<br/>';});return h;
+    }},
+    legend:{data:products,textStyle:{color:'#94a3b8',fontSize:10},top:0},
+    grid:{left:'3%',right:'4%',bottom:'12%',top:'15%',containLabel:true},
+    xAxis:{type:'category',data:allDates,axisLine:{lineStyle:{color:'#2d3a50'}},axisLabel:{color:'#64748b',fontSize:10}},
+    yAxis:{type:'value',splitLine:{lineStyle:{color:'#1e293b',type:'dashed'}},axisLabel:{color:'#64748b',fontSize:10,formatter:function(v){return '$ '+v;}}},
+    dataZoom:[{type:'inside',start:0,end:100},{type:'slider',start:0,end:100,height:18,bottom:2,borderColor:'#2d3a50'}],
+    series:series
+  });
+  window.addEventListener('resize',function(){try{chart.resize()}catch(e){}});
+}
+
+// ====== 品种历史走势 (弹窗) ======
+var modalChart=null;
+function openHistory(prod){
+  var h=DATA.historical;
+  if(!h||!h[prod]||!h[prod].prices||h[prod].prices.length<1){
+    alert('该品种暂无历史数据');
+    return;
+  }
+  document.getElementById('modalTitle').textContent='📈 '+prod+' — 历史走势';
+  var item=null;
+  if(DATA.today_data)for(var i=0;i<DATA.today_data.length;i++){if(DATA.today_data[i].product===prod){item=DATA.today_data[i];break;}}
+  var info='';
+  if(item)info='<span>当前价: '+(item.price!==null?fmt(item.price):'—')+'</span><span>单位: '+(item.unit||'')+'</span><span>来源: '+(item.source||'')+'</span>';
+  info+='<span style="cursor:pointer;color:#c084fc" onclick="toggleCompare(\''+prod.replace(/'/g,"\\'")+'\');closeModal()">➕ 加入对比</span>';
+  document.getElementById('modalInfo').innerHTML=info;
+  document.getElementById('historyModal').classList.add('active');
+  setTimeout(function(){
+    var dom=document.getElementById('modalChart');
+    if(!dom)return;
+    if(modalChart)try{modalChart.dispose();}catch(e){}
+    modalChart=echarts.init(dom,'dark');
+    var d=h[prod];
+    var allDates=d.dates;
+    var prices=d.prices.map(function(v){return v===null?undefined:v;});
+    var changes=d.changes||[];
+    // Compute monthly average for current month
+    var monthAvg=null,monthLabel='';
+    var latestDate=allDates[allDates.length-1];
+    if(latestDate&&latestDate.length>=7){
+      var monthPrefix=latestDate.substring(0,7); // YYYY-MM
+      var monthPrices=[];
+      for(var mi=0;mi<prices.length;mi++){
+        if(prices[mi]!==undefined&&allDates[mi]&&allDates[mi].substring(0,7)===monthPrefix){
+          monthPrices.push(prices[mi]);
+        }
+      }
+      if(monthPrices.length>1){
+        var sum=0;for(var si=0;si<monthPrices.length;si++)sum+=monthPrices[si];
+        monthAvg=sum/monthPrices.length;
+        monthLabel='本月均('+monthPrefix+'): ';
+      }
+    }
+    // Prepare markLine data
+    var markData=[{type:'average',name:'均价',
+      label:{formatter:'均价: {c}',color:'#fbbf24',fontSize:11,position:'insideEndTop'},
+      lineStyle:{color:'#fbbf24',width:2,type:'dashed'}}];
+    if(monthAvg!==null){
+      markData.push({yAxis:monthAvg,name:'本月均',
+        label:{formatter: monthLabel+'{c}',color:'#34d399',fontSize:11,position:'insideEndTop'},
+        lineStyle:{color:'#34d399',width:2,type:'solid'}});
+    }
+    modalChart.setOption({
+      tooltip:{trigger:'axis',axisPointer:{type:'cross'},
+        formatter:function(params){
+          var p=params[0];if(!p)return'';
+          var idx=p.dataIndex;var chg=changes[idx];var ch=changes;
+          var v=p.value;var vs=v>=1000?Number(v).toLocaleString('zh-CN'):Number(v).toFixed(2);
+          var cs='';
+          if(chg!==null&&chg!==undefined){cs=chg>0?'▲+'+(chg>=1000?Number(chg).toLocaleString('zh-CN'):chg.toFixed(2)):chg<0?'▼'+(chg>=1000?Number(chg).toLocaleString('zh-CN'):chg.toFixed(2)):'—';}
+          var html='<strong>'+p.axisValue+'</strong><br/>'+p.marker+' '+prod+': '+vs+'<br/>涨跌: '+cs;
+          // Show monthly avg
+          if(monthAvg!==null&&p.axisValue&&p.axisValue.length>=7&&p.axisValue.substring(0,7)===monthPrefix){
+            html+='<br/><span style="color:#34d399">⎯ 月均: '+fmt(monthAvg)+'</span>';
+          }
+          return html;
+        }
+      },
+      grid:{left:'3%',right:'4%',bottom:'12%',top:'6%',containLabel:true},
+      xAxis:{type:'category',data:allDates,axisLine:{lineStyle:{color:'#2d3a50'}},axisLabel:{color:'#64748b',fontSize:10}},
+      yAxis:{type:'value',splitLine:{lineStyle:{color:'#1e293b',type:'dashed'}},axisLabel:{color:'#64748b',fontSize:10,
+        formatter:function(v){
+          var s=v>=1000?Math.round(v/1000)+'k':v.toFixed(0);
+          if(monthAvg!==null&&Math.abs(v-monthAvg)<monthAvg*0.005)s+=' ★'; // mark month avg vicinity
+          return s;
+        }}},
+      dataZoom:[{type:'inside',start:0,end:100},{type:'slider',start:0,end:100,height:18,bottom:2,borderColor:'#2d3a50'}],
+      series:[{type:'line',smooth:true,symbolSize:4,data:prices,lineStyle:{width:2,color:'#c65911'},
+        areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(198,89,17,0.3)'},{offset:1,color:'rgba(198,89,17,0.01)'}]}},
+        markLine:{symbol:'none',silent:true,data:markData},
+        emphasis:{focus:'series'}}]
+    });
+    modalChart.resize();
+  },100);
+}
+function closeModal(){
+  document.getElementById('historyModal').classList.remove('active');
+  if(modalChart){try{modalChart.dispose();}catch(e){}modalChart=null;}
+}
+
+// ====== 自定义对比 ======
+var compareList=[];
+function toggleCompare(prod){
+  var idx=compareList.indexOf(prod);
+  if(idx>=0){compareList.splice(idx,1);} else {compareList.push(prod);}
+  updateCompTags();
+}
+function clearCompare(){compareList=[];updateCompTags();var dom=document.getElementById('compareChart');if(dom)dom.innerHTML='';}
+function updateCompTags(){
+  var div=document.getElementById('compTags');
+  if(compareList.length===0){div.innerHTML='<div style="font-size:11px;color:#475569" id="compEmpty">尚未添加品种，搜索后点击名称添加</div>';return;}
+  var html='';
+  compareList.forEach(function(p){
+    var ep=p.replace(/'/g,"\\'");
+    html+='<div class="comp-tag">'+p+'<button onclick="toggleCompare(\''+ep+'\');renderCompareChart()">✕</button></div>';
+  });
+  div.innerHTML=html;
+}
+function filterComp(){
+  var q=document.getElementById('compSearch').value.trim().toLowerCase();
+  var hint=document.getElementById('compHint');
+  if(!q||!DATA.today_data){hint.style.display='none';return;}
+  var seen={};var matches=[];
+  DATA.today_data.forEach(function(item){
+    var p=item.product;if(!p||seen[p])return;seen[p]=true;
+    if(p.toLowerCase().indexOf(q)>=0&&compareList.indexOf(p)<0)matches.push(p);
+  });
+  if(matches.length===0){hint.style.display='none';return;}
+  var limited=matches.slice(0,20);
+  var html='';
+  limited.forEach(function(p){
+    var ep=p.replace(/'/g,"\\'");
+    html+='<div onmousedown="toggleCompare(\''+ep+'\');document.getElementById(\'compSearch\').value=\'\';filterComp();">'+p+'</div>';
+  });
+  hint.innerHTML=html;hint.style.display='block';
+}
+function renderCompareChart(){
+  if(compareList.length===0){return;}
+  var dom=document.getElementById('compareChart');if(!dom)return;
+  var chart=echarts.init(dom,'dark');
+  var series=[];var allDates=[];var hasData=false;
+  compareList.forEach(function(p){
+    var h=DATA.historical[p];if(!h||!h.prices||h.prices.length===0)return;
+    series.push({name:p,type:'line',smooth:true,symbolSize:4,data:h.prices,lineStyle:{width:2},emphasis:{focus:'series'}});
+    if(h.dates)allDates=allDates.concat(h.dates);
+    if(h.prices.length>0)hasData=true;
+  });
+  if(!hasData){chart.setOption({title:{text:'所选品种均无历史数据',textStyle:{color:'#64748b',fontSize:14}}});return;}
+  allDates=[...new Set(allDates)].sort();
+  chart.setOption({
+    tooltip:{trigger:'axis',axisPointer:{type:'cross'},
+      formatter:function(params){
+        var h='<strong>'+params[0].axisValue+'</strong><br/>';
+        params.forEach(function(p){h+=p.marker+' '+p.seriesName+': '+(p.value>=1000?Number(p.value).toLocaleString('zh-CN'):Number(p.value).toFixed(2))+'<br/>';});return h;
+      }
+    },
+    legend:{data:compareList,textStyle:{color:'#94a3b8',fontSize:10},top:0},
+    grid:{left:'3%',right:'4%',bottom:'12%',top:'15%',containLabel:true},
+    xAxis:{type:'category',data:allDates,axisLine:{lineStyle:{color:'#2d3a50'}},axisLabel:{color:'#64748b',fontSize:10}},
+    yAxis:{type:'value',splitLine:{lineStyle:{color:'#1e293b',type:'dashed'}},axisLabel:{color:'#64748b',fontSize:10,
+      formatter:function(v){return v>=1000?Math.round(v/1000)+'k':v;}}},
+    dataZoom:[{type:'inside',start:0,end:100},{type:'slider',start:0,end:100,height:18,bottom:2,borderColor:'#2d3a50'}],
+    series:series
+  });
+  window.addEventListener('resize',function(){try{chart.resize()}catch(e){}});
+}
+
+// ====== INIT ======
+document.getElementById('headerTime').textContent='最后更新: '+(DATA.last_update||'N/A');
+document.addEventListener('DOMContentLoaded',function(){renderPriceCards('all');renderCharts(DATA);try{initGradeRef();}catch(e){}});
+</script>
+</body>
+</html>
